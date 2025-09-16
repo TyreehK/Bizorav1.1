@@ -1,3 +1,4 @@
+// src/components/Navigation.tsx
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -6,9 +7,10 @@ import { ChevronDown } from "lucide-react";
 const Navigation = () => {
   const location = useLocation();
 
+  // Unieke paden (geen dubbele "/features")
   const navItems = [
     { name: "Functies", path: "/features" },
-    { name: "Zakelijke rekening", path: "/features" },
+    { name: "Zakelijke rekening", path: "/business-account" },
     { name: "Prijzen", path: "/pricing" },
     { name: "Ondersteuning", path: "/contact" },
     { name: "Accountants", path: "/about" },
@@ -28,13 +30,11 @@ const Navigation = () => {
           <div className="hidden md:flex space-x-8">
             {navItems.map((item) => (
               <Link
-                key={item.path}
+                key={`${item.name}-${item.path}`} // unieke key
                 to={item.path}
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-primary flex items-center space-x-1",
-                  location.pathname === item.path
-                    ? "text-primary"
-                    : "text-foreground"
+                  location.pathname === item.path ? "text-primary" : "text-foreground"
                 )}
               >
                 <span>{item.name}</span>
@@ -44,12 +44,16 @@ const Navigation = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" className="text-foreground">
-              Inloggen
-            </Button>
-            <Button size="sm" className="bg-primary hover:bg-primary/90">
-              Registreren
-            </Button>
+            <Link to="/login">
+              <Button variant="ghost" size="sm" className="text-foreground">
+                Inloggen
+              </Button>
+            </Link>
+            <Link to="/register">
+              <Button size="sm" className="bg-primary hover:bg-primary/90">
+                Registreren
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
