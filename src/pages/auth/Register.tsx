@@ -20,28 +20,30 @@ export default function Register() {
     setMsg(null);
     setErr(null);
 
-    // Confirm email UIT in Supabase → geen redirect nodig
+    const redirect = `${window.location.origin}/verify-email`;
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName },
-        // emailRedirectTo: NIET meegeven in deze dev-variant
+        emailRedirectTo: redirect,
       },
     });
 
     setLoading(false);
 
     if (error) {
+      // 500 = vrijwel altijd SMTP/redirect probleem of DB-trigger side-effect
       const hint =
         error.status === 500
-          ? "Mogelijk staat je Codespaces/localhost redirect niet whitelisted óf Confirm email staat nog aan zonder SMTP."
+          ? "Controleer SMTP (Resend) + whitelisted redirects in Supabase, en verifieer je profiles-trigger/policies."
           : "";
       setErr(`${error.message}${hint ? `\n\n${hint}` : ""}`);
       return;
     }
 
-    setMsg("Registratie gelukt. Je kunt nu inloggen met je wachtwoord.");
+    setMsg("Registratie gelukt. Check je e-mail om je account te bevestigen.");
   };
 
   return (
