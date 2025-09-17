@@ -26,6 +26,9 @@ import VerifyEmail from "./pages/auth/VerifyEmail";
 import Dashboard from "./pages/Dashboard";
 import AuthGate from "./components/AuthGate";
 
+// Nieuw: Profiel
+import Profile from "./pages/Profile";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -40,6 +43,7 @@ const App = () => (
           {/* Publiek */}
           <Route path="/" element={<Home />} />
           <Route path="/features" element={<Features />} />
+          <Route path="/business-account" element={<Features />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
@@ -59,6 +63,14 @@ const App = () => (
             element={
               <AuthGate>
                 <Dashboard />
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <AuthGate>
+                <Profile />
               </AuthGate>
             }
           />

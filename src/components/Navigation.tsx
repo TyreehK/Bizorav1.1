@@ -1,13 +1,14 @@
-// src/components/Navigation.tsx
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const Navigation = () => {
   const location = useLocation();
+  const { loading, user } = useSupabaseAuth();
 
-  // Unieke paden (geen dubbele "/features")
   const navItems = [
     { name: "Functies", path: "/features" },
     { name: "Zakelijke rekening", path: "/business-account" },
@@ -16,44 +17,57 @@ const Navigation = () => {
     { name: "Accountants", path: "/about" },
   ];
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
+
   return (
-    <nav className="fixed top-0 w-full bg-background border-b border-border z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="fixed top-0 w-full header-glass z-50">
+      <div className="container-page">
         <div className="flex justify-between items-center h-16">
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
-              <span className="text-white font-bold text-lg">B</span>
+          <Link to="/" className="group flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 grid place-content-center shadow">
+              <span className="text-white font-extrabold text-lg">B</span>
             </div>
-            <span className="text-xl font-bold text-foreground">Bizora</span>
+            <span className="text-lg sm:text-xl font-semibold tracking-tight group-hover:opacity-90">
+              Bizora
+            </span>
           </Link>
 
-          <div className="hidden md:flex space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             {navItems.map((item) => (
               <Link
-                key={`${item.name}-${item.path}`} // unieke key
+                key={`${item.name}-${item.path}`}
                 to={item.path}
                 className={cn(
-                  "text-sm font-medium transition-colors hover:text-primary flex items-center space-x-1",
-                  location.pathname === item.path ? "text-primary" : "text-foreground"
+                  "text-sm font-medium transition-colors hover:text-white/90 flex items-center gap-1",
+                  location.pathname === item.path ? "text-white" : "text-white/70"
                 )}
               >
                 <span>{item.name}</span>
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-3 w-3 opacity-50" />
               </Link>
             ))}
           </div>
 
-          <div className="flex items-center space-x-4">
-            <Link to="/login">
-              <Button variant="ghost" size="sm" className="text-foreground">
-                Inloggen
-              </Button>
-            </Link>
-            <Link to="/register">
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
-                Registreren
-              </Button>
-            </Link>
+          <div className="flex items-center gap-2">
+            {loading ? (
+              <div className="h-11 w-36 bg-white/5 rounded-xl animate-pulse" />
+            ) : user ? (
+              <>
+                <Link to="/dashboard" className="btn-ghost">Dashboard</Link>
+                <Link to="/profile" className="btn-ghost">Profiel</Link>
+                <button className="btn-primary" onClick={handleLogout}>
+                  Uitloggen
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="btn-ghost">Inloggen</Link>
+                <Link to="/register" className="btn-primary">Registreren</Link>
+              </>
+            )}
           </div>
         </div>
       </div>
