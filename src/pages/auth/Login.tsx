@@ -1,132 +1,210 @@
 // src/pages/auth/Login.tsx
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { useNavigate, Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { LogIn, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 
 export default function Login() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [loadingPw, setLoadingPw] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const emailValid = useMemo(() => /^\S+@\S+\.\S+$/.test(email), [email]);
-  const passwordValid = useMemo(() => password.length >= 6, [password]);
-  const formValid = emailValid && passwordValid;
+  // Als je al ingelogd bent → meteen door
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.user) {
+        navigate("/dashboard", { replace: true });
+      }
+    })();
+  }, [navigate]);
 
-  const loginWithPassword = async (e: React.FormEvent) => {
+  const canSubmit = useMemo(
+    () => email.trim().length > 3 && password.length >= 6 && !loading,
+    [email, password, loading]
+  );
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formValid) return;
-    setLoadingPw(true); setMsg(null); setErr(null);
+    setErr(null);
+    setMsg(null);
+    if (!canSubmit) return;
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoadingPw(false);
+    setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    setLoading(false);
 
-    if (error) { setErr(error.message); return; }
-    window.location.href = "/post-login";
+    if (error) {
+      // Veelvoorkomende meldingen mooier tonen
+      if (/invalid login credentials/i.test(error.message)) {
+        setErr("Onjuiste inloggegevens.");
+      } else if (/email not confirmed/i.test(error.message)) {
+        setErr("E-mailadres nog niet bevestigd. Klik op ‘verificatiemail opnieuw sturen’.");
+      } else {
+        setErr(error.message);
+      }
+      return;
+    }
+
+    if (data.session?.user) {
+      // Succes → via laadpagina naar dashboard
+      navigate("/dashboard/loading", { replace: true });
+    } else {
+      setErr("Kon geen sessie starten. Probeer het opnieuw.");
+    }
+  };
+
+  const resendVerification = async () => {
+    setErr(null);
+    setMsg(null);
+    const e = email.trim();
+    if (!e) {
+      setErr("Vul je e-mail in om de verificatiemail te versturen.");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: e,
+      options: {
+        emailRedirectTo: `${window.location.origin}/login`,
+      },
+    });
+    setLoading(false);
+    if (error) {
+      setErr(error.message);
+    } else {
+      setMsg("Verificatiemail opnieuw verstuurd. Check je inbox.");
+    }
+  };
+
+  const sendReset = async () => {
+    setErr(null);
+    setMsg(null);
+    const e = email.trim();
+    if (!e) {
+      setErr("Vul je e-mail in om een reset-link te ontvangen.");
+      return;
+    }
+    setSendingReset(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(e, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSendingReset(false);
+    if (error) setErr(error.message);
+    else setMsg("Reset-link verstuurd. Check je inbox.");
   };
 
   return (
-    <div className="pt-24">
-      <div className="container-page min-h-[calc(100vh-8rem)] grid md:grid-cols-2 gap-10 items-center">
-        <div className="order-2 md:order-1">
-          <Card className="card p-6 md:p-8">
-            <CardHeader className="p-0">
-              <CardTitle className="text-2xl md:text-3xl tracking-tight">Inloggen</CardTitle>
-              <p className="text-white/70 text-sm mt-2">Welkom terug. Log in om je dashboard te openen.</p>
-            </CardHeader>
-            <CardContent className="p-0 mt-6">
-              <form className="space-y-5" onSubmit={loginWithPassword} noValidate>
-                <div>
-                  <Label htmlFor="email" className="text-white/90">E-mail</Label>
-                  <div className="relative mt-1">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50 pointer-events-none" />
-                    <Input
-                      id="email"
-                      type="email"
-                      className="input pl-9"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="jij@voorbeeld.nl"
-                      aria-invalid={!emailValid && email.length > 0}
-                      required
-                    />
-                  </div>
-                </div>
+    <div className="min-h-screen bg-background relative flex items-center justify-center px-4">
+      {/* zachte blobs */}
+      <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-gradient-to-br from-blue-500/40 to-emerald-400/40 blur-3xl" />
+      <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-gradient-to-tr from-emerald-400/30 to-blue-500/30 blur-3xl" />
 
-                <div>
-                  <Label htmlFor="password" className="text-white/90">Wachtwoord</Label>
-                  <div className="relative mt-1">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50 pointer-events-none" />
-                    <Input
-                      id="password"
-                      type={showPw ? "text" : "password"}
-                      className="input pl-9 pr-10"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      aria-invalid={!passwordValid && password.length > 0}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPw((s) => !s)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg hover:bg-white/10 transition"
-                      aria-label={showPw ? "Verberg wachtwoord" : "Toon wachtwoord"}
-                    >
-                      {showPw ? <EyeOff className="h-4 w-4 text-white/70" /> : <Eye className="h-4 w-4 text-white/70" />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={!formValid || loadingPw} className="btn-primary w-full">
-                  {loadingPw ? "Bezig..." : <span className="inline-flex items-center">Inloggen <ArrowRight className="ml-2 h-4 w-4" /></span>}
-                </Button>
-
-                {msg && <p className="text-emerald-400 text-sm whitespace-pre-wrap">{msg}</p>}
-                {err && <p className="text-red-400 text-sm whitespace-pre-wrap">{err}</p>}
-
-                <div className="flex justify-between text-sm text-white/80">
-                  <Link to="/register" className="underline">Account aanmaken</Link>
-                  <Link to="/reset-password" className="underline">Wachtwoord vergeten</Link>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+      <div className="w-[min(480px,92vw)] card p-6 relative">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-9 h-9 bg-primary rounded flex items-center justify-center">
+            <span className="text-white font-bold text-lg">B</span>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold leading-tight">Inloggen</h1>
+            <p className="text-sm text-white/60">Welkom terug bij Bizora</p>
+          </div>
         </div>
 
-        {/* Visual panel */}
-        <div className="order-1 md:order-2">
-          <div className="card p-8 md:p-10 relative overflow-hidden">
-            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-gradient-to-br from-blue-500/40 to-emerald-400/40 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-gradient-to-tr from-emerald-400/30 to-blue-500/30 blur-3xl" />
-            <div className="relative">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs">
-                <Sparkles className="h-3.5 w-3.5" />
-                Strak & snel
-              </div>
-              <h2 className="mt-4 text-3xl md:text-4xl font-extrabold tracking-tight">Minimalistisch. Modern. Focus.</h2>
-              <p className="mt-3 text-white/75">Consistente spacing, glas-effect, duidelijke hiërarchie.</p>
-              <ul className="mt-6 space-y-3">
-                {[
-                  { icon: <ShieldCheck className="h-4 w-4" />, text: "Veilig inloggen via Supabase" },
-                  { icon: <Sparkles className="h-4 w-4" />, text: "Schone formulieren met validatie" },
-                  { icon: <ArrowRight className="h-4 w-4" />, text: "Door naar je omgeving" },
-                ].map((f, i) => (
-                  <li key={i} className="flex items-center gap-3">
-                    <div className="h-8 w-8 grid place-content-center rounded-xl bg-white/10">{f.icon}</div>
-                    <span className="text-white/85">{f.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <form onSubmit={onSubmit} className="space-y-3">
+          <div>
+            <label className="text-sm text-white/80">E-mail</label>
+            <Input
+              className="input mt-1"
+              type="email"
+              placeholder="jij@bedrijf.nl"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
           </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-white/80">Wachtwoord</label>
+              <button
+                type="button"
+                className="text-xs text-white/60 hover:text-white/80 transition-colors"
+                onClick={() => setShowPw((v) => !v)}
+                aria-label={showPw ? "Verberg wachtwoord" : "Toon wachtwoord"}
+              >
+                {showPw ? (
+                  <span className="inline-flex items-center gap-1"><EyeOff className="h-3.5 w-3.5" /> verberg</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> toon</span>
+                )}
+              </button>
+            </div>
+            <Input
+              className="input mt-1"
+              type={showPw ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+
+          {/* Meldingen */}
+          {err && <div className="text-sm text-red-300">{err}</div>}
+          {msg && <div className="text-sm text-emerald-300">{msg}</div>}
+
+          <Button
+            type="submit"
+            disabled={!canSubmit}
+            className="btn-primary w-full h-11 inline-flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+            {loading ? "Bezig met inloggen…" : "Inloggen"}
+          </Button>
+
+          <div className="flex items-center justify-between text-xs text-white/70">
+            <button
+              className="inline-flex items-center gap-1 hover:text-white/90 transition-colors"
+              type="button"
+              onClick={resendVerification}
+              disabled={loading}
+              title="E-mailverificatie opnieuw sturen"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Verificatiemail opnieuw sturen
+            </button>
+
+            <button
+              type="button"
+              onClick={sendReset}
+              disabled={sendingReset}
+              className="hover:text-white/90 transition-colors"
+              title="Wachtwoord vergeten"
+            >
+              {sendingReset ? "Reset sturen…" : "Wachtwoord vergeten?"}
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-4 text-sm text-white/70">
+          Nog geen account?{" "}
+          <Link to="/register" className="text-primary hover:underline">Registreren</Link>
         </div>
       </div>
     </div>

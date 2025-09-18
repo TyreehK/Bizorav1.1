@@ -1,21 +1,20 @@
 // src/integrations/supabase/client.ts
 import { createClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const supabaseUrl = "https://xizxtcniizodksshurgi.supabase.co";
+const supabaseAnonKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpenh0Y25paXpvZGtzc2h1cmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NzIyMTksImV4cCI6MjA3MzU0ODIxOX0.gozjI0BeXYbUhRMzTOaY7wBgUx-rzZ-0ZHj30PEzudQ";
 
-if (!url || !anon) {
-  // Hard fail early so je het meteen merkt in dev
-  throw new Error(
-    "Supabase env ontbreekt. Zet VITE_SUPABASE_URL en VITE_SUPABASE_ANON_KEY in .env.local"
-  );
-}
-
-// Standaard browser client
-export const supabase = createClient(url, anon, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    storageKey: "bizora.auth", // eigen key voorkomt clashes
+  },
+  global: {
+    headers: {
+      "x-bizora-client": "web-app",
+    },
   },
 });

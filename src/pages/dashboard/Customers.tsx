@@ -1,267 +1,126 @@
 // src/pages/dashboard/Customers.tsx
-import { useMemo, useState } from "react";
-import { useCustomers, useCustomerMutations, Customer } from "@/hooks/useCustomers";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Plus, Search, Pencil, Trash2, X } from "lucide-react";
 
-function formatDate(iso?: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleDateString();
-}
+type Customer = {
+  id: string;
+  name: string;
+  email: string | null;
+  created_at?: string;
+};
 
-type FormState = Partial<Customer>;
+export default function Customers() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [list, setList] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-export default function CustomersPage() {
-  const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Customer | null>(null);
-  const emptyForm: FormState = useMemo(() => ({
-    name: "",
-    email: "",
-    phone: "",
-    company: "",
-    vat_number: "",
-    address: "",
-    city: "",
-    postal_code: "",
-    country: "",
-    notes: "",
-  }), []);
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [message, setMessage] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const { list, count, key } = useCustomers(search);
-  const { create, update, remove } = useCustomerMutations(key);
-
-  const startCreate = () => {
-    setEditing(null);
-    setForm(emptyForm);
-    setShowForm(true);
-    setMessage(null);
-    setErr(null);
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id,name,email,created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) setErrorMsg(error.message);
+    setList((data as Customer[]) || []);
+    setLoading(false);
   };
 
-  const startEdit = (c: Customer) => {
-    setEditing(c);
-    setForm({
-      name: c.name,
-      email: c.email ?? "",
-      phone: c.phone ?? "",
-      company: c.company ?? "",
-      vat_number: c.vat_number ?? "",
-      address: c.address ?? "",
-      city: c.city ?? "",
-      postal_code: c.postal_code ?? "",
-      country: c.country ?? "",
-      notes: c.notes ?? "",
-    });
-    setShowForm(true);
-    setMessage(null);
-    setErr(null);
-  };
+  useEffect(() => {
+    load();
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null); setErr(null);
-    try {
-      if (!form.name || form.name.trim().length < 2) {
-        setErr("Naam is verplicht (min. 2 tekens).");
-        return;
-      }
-      if (editing) {
-        await update.mutateAsync({ id: editing.id, patch: form });
-        setMessage("Klant bijgewerkt.");
-      } else {
-        await create.mutateAsync(form);
-        setMessage("Klant toegevoegd.");
-      }
-      setShowForm(false);
-      setEditing(null);
-      setForm(emptyForm);
-    } catch (e: any) {
-      setErr(e.message ?? "Er ging iets mis.");
-    }
-  };
+    setErrorMsg(null);
 
-  const onDelete = async (c: Customer) => {
-    if (!confirm(`Verwijder klant "${c.name}"?`)) return;
-    setErr(null); setMessage(null);
-    try {
-      await remove.mutateAsync(c.id);
-      setMessage("Klant verwijderd.");
-    } catch (e: any) {
-      setErr(e.message ?? "Verwijderen mislukt.");
+    const nameTrim = name.trim();
+    if (!nameTrim) {
+      setErrorMsg("Naam is verplicht.");
+      return;
     }
+
+    // ✅ Zeker weten dat we een geldige sessie hebben (voorkomt 401)
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess.session) {
+      setErrorMsg("Je sessie is verlopen. Log opnieuw in.");
+      return;
+    }
+
+    setSaving(true);
+    const { data, error } = await supabase
+      .from("customers")
+      .insert([{ name: nameTrim, email: email.trim() || null }])
+      .select();
+
+    setSaving(false);
+    if (error) {
+      setErrorMsg(error.message);
+      return;
+    }
+    setName("");
+    setEmail("");
+    await load();
   };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Klanten</h1>
-          <p className="text-white/70 mt-1">
-            Beheer relaties en klantgegevens.
-            {typeof count.data === "number" && (
-              <span className="ml-2 text-white/60">Totaal: {count.data}</span>
-            )}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
-            <Input
-              className="input pl-9 w-64"
-              placeholder="Zoek op naam, e-mail, bedrijf, stad…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Button className="btn-primary" onClick={startCreate}>
-            <Plus className="h-4 w-4 mr-2" /> Nieuwe klant
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Klanten</h1>
+        <p className="text-white/70 mt-1">
+          Voeg klanten toe en beheer je relaties. Je bent ingelogd; RLS zet de rij op jouw account.
+        </p>
+      </div>
+
+      <div className="card p-4">
+        <h2 className="text-lg font-semibold">Nieuwe klant</h2>
+        <form onSubmit={onSubmit} className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Input
+            className="input"
+            placeholder="Bedrijfsnaam *"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Input
+            className="input"
+            type="email"
+            placeholder="E-mail (optioneel)"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Button type="submit" disabled={saving} className="btn-primary">
+            {saving ? "Opslaan…" : "Toevoegen"}
           </Button>
-        </div>
+        </form>
+        {errorMsg && <div className="text-red-300 text-sm mt-2">{errorMsg}</div>}
       </div>
 
-      {/* Meldingen */}
-      {message && <p className="mt-3 text-emerald-400 text-sm">{message}</p>}
-      {err && <p className="mt-3 text-red-400 text-sm whitespace-pre-wrap">{err}</p>}
-
-      {/* Tabel */}
-      <div className="mt-6 overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="text-left text-white/70 border-b border-white/10">
-              <th className="py-2 pr-4">Naam</th>
-              <th className="py-2 pr-4">E-mail</th>
-              <th className="py-2 pr-4">Bedrijf</th>
-              <th className="py-2 pr-4">Plaats</th>
-              <th className="py-2 pr-4">Aangemaakt</th>
-              <th className="py-2 pr-4">Acties</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.isLoading ? (
-              <tr><td colSpan={6} className="py-6 text-center text-white/70">Laden…</td></tr>
-            ) : (list.data || []).length === 0 ? (
-              <tr><td colSpan={6} className="py-6 text-center text-white/60">Geen klanten gevonden.</td></tr>
-            ) : (
-              list.data!.map((c) => (
-                <tr key={c.id} className="border-b border-white/5">
-                  <td className="py-3 pr-4">{c.name}</td>
-                  <td className="py-3 pr-4">{c.email ?? "-"}</td>
-                  <td className="py-3 pr-4">{c.company ?? "-"}</td>
-                  <td className="py-3 pr-4">{c.city ?? "-"}</td>
-                  <td className="py-3 pr-4">{formatDate(c.created_at)}</td>
-                  <td className="py-3 pr-4">
-                    <div className="flex items-center gap-2">
-                      <button className="btn-ghost h-9 px-3" onClick={() => startEdit(c)}>
-                        <Pencil className="h-4 w-4 mr-1" /> Bewerken
-                      </button>
-                      <button className="btn-ghost h-9 px-3" onClick={() => onDelete(c)}>
-                        <Trash2 className="h-4 w-4 mr-1" /> Verwijderen
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Overlay Form (simpel, geen externe Dialog nodig) */}
-      {showForm && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-background p-6 card rounded-none">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
-                {editing ? "Klant bewerken" : "Nieuwe klant"}
-              </h2>
-              <button className="btn-ghost h-9 px-3" onClick={() => setShowForm(false)}>
-                <X className="h-4 w-4 mr-1" /> Sluiten
-              </button>
-            </div>
-
-            <form className="mt-4 grid gap-4" onSubmit={onSubmit}>
-              <div>
-                <Label htmlFor="name">Naam *</Label>
-                <Input id="name" className="input mt-1"
-                       value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input id="email" className="input mt-1" type="email"
-                         value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Telefoon</Label>
-                  <Input id="phone" className="input mt-1"
-                         value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="company">Bedrijf</Label>
-                <Input id="company" className="input mt-1"
-                       value={form.company || ""} onChange={(e) => setForm({ ...form, company: e.target.value })} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="vat_number">BTW-nummer</Label>
-                  <Input id="vat_number" className="input mt-1"
-                         value={form.vat_number || ""} onChange={(e) => setForm({ ...form, vat_number: e.target.value })} />
-                </div>
-                <div>
-                  <Label htmlFor="country">Land</Label>
-                  <Input id="country" className="input mt-1"
-                         value={form.country || ""} onChange={(e) => setForm({ ...form, country: e.target.value })} />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="address">Adres</Label>
-                <Input id="address" className="input mt-1"
-                       value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="city">Plaats</Label>
-                  <Input id="city" className="input mt-1"
-                         value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                </div>
-                <div>
-                  <Label htmlFor="postal_code">Postcode</Label>
-                  <Input id="postal_code" className="input mt-1"
-                         value={form.postal_code || ""} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} />
-                </div>
-                <div>
-                  <Label htmlFor="notes">Opmerking</Label>
-                  <Input id="notes" className="input mt-1"
-                         value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="flex gap-2 mt-2">
-                <Button type="submit" className="btn-primary">
-                  {editing ? "Opslaan" : "Toevoegen"}
-                </Button>
-                <button type="button" className="btn-ghost" onClick={() => setShowForm(false)}>Annuleren</button>
-              </div>
-
-              {err && <p className="text-red-400 text-sm whitespace-pre-wrap">{err}</p>}
-            </form>
+      <div className="card p-4">
+        <h2 className="text-lg font-semibold">Laatst toegevoegd</h2>
+        {loading ? (
+          <div className="animate-pulse mt-3 space-y-2">
+            <div className="h-4 w-2/3 bg-white/10 rounded" />
+            <div className="h-4 w-1/2 bg-white/10 rounded" />
+            <div className="h-4 w-3/5 bg-white/10 rounded" />
           </div>
-        </div>
-      )}
+        ) : list.length === 0 ? (
+          <div className="text-white/60 text-sm mt-3">Nog geen klanten.</div>
+        ) : (
+          <ul className="mt-3 divide-y divide-white/10">
+            {list.map((c) => (
+              <li key={c.id} className="py-2">
+                <div className="font-medium">{c.name}</div>
+                <div className="text-xs text-white/60">{c.email || "—"}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

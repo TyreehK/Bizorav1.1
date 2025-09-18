@@ -15,9 +15,19 @@ import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import SupabaseTest from "./pages/SupabaseTest";
 
+// Auth pages
+import Login from "./pages/auth/Login";
+import ResetPassword from "./pages/auth/ResetPassword";
+import Register from "./pages/auth/RegisterWizard";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import CompleteProfile from "./pages/auth/CompleteProfile";
+
+// Auth guard
+import RequireAuth from "@/components/auth/RequireAuth";
+
 // Dashboard layout + pagina's
 import DashboardLayout from "./layouts/DashboardLayout";
-import LoadingPage from "./pages/dashboard/Loading";   // <— NIEUW
+import LoadingPage from "./pages/dashboard/Loading";
 import Overview from "./pages/dashboard/Overview";
 import Invoices from "./pages/dashboard/Invoices";
 import Purchases from "./pages/dashboard/Purchases";
@@ -44,6 +54,13 @@ function AppShell() {
       {!isDashboard && <Navigation />}
 
       <Routes>
+        {/* Auth */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} /> {/* optioneel */}
+        <Route path="/complete-profile" element={<CompleteProfile />} />
+
         {/* Landingssite */}
         <Route path="/" element={<Home />} />
         <Route path="/features" element={<Features />} />
@@ -54,10 +71,17 @@ function AppShell() {
         {/* Supabase test */}
         <Route path="/supabase-test" element={<SupabaseTest />} />
 
-        {/* Dashboard */}
-        <Route path="/dashboard" element={<DashboardLayout />}>
+        {/* Dashboard (beveiligd) */}
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <DashboardLayout />
+            </RequireAuth>
+          }
+        >
           <Route index element={<Overview />} />
-          <Route path="loading" element={<LoadingPage />} />   {/* <— NIEUW */}
+          <Route path="loading" element={<LoadingPage />} />
           <Route path="invoices" element={<Invoices />} />
           <Route path="purchases" element={<Purchases />} />
           <Route path="banking" element={<Banking />} />
