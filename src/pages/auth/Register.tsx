@@ -17,7 +17,6 @@ export default function Register() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // Inline validatie
   const emailValid = useMemo(() => /^\S+@\S+\.\S+$/.test(email), [email]);
   const passwordValid = useMemo(() => password.length >= 6, [password]);
   const nameValid = useMemo(() => fullName.trim().length >= 2, [fullName]);
@@ -28,7 +27,7 @@ export default function Register() {
     if (!formValid) return;
     setLoading(true); setMsg(null); setErr(null);
 
-    // Confirm email = OFF → geen emailRedirectTo
+    // Confirm email = OFF in dev → geen redirect
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -45,7 +44,7 @@ export default function Register() {
 
     if (data.session) {
       setMsg("Registratie gelukt en ingelogd. Doorschakelen…");
-      setTimeout(() => (window.location.href = "/dashboard"), 700);
+      setTimeout(() => (window.location.href = "/post-login"), 700);
     } else {
       setMsg("Registratie gelukt. Log nu in met je wachtwoord.");
     }
@@ -63,7 +62,6 @@ export default function Register() {
             </CardHeader>
             <CardContent className="p-0 mt-6">
               <form className="space-y-5" onSubmit={onSubmit} noValidate>
-                {/* Naam */}
                 <div>
                   <Label htmlFor="full_name" className="text-white/90">Naam</Label>
                   <div className="relative mt-1">
@@ -82,7 +80,6 @@ export default function Register() {
                   )}
                 </div>
 
-                {/* E-mail */}
                 <div>
                   <Label htmlFor="email" className="text-white/90">E-mail</Label>
                   <div className="relative mt-1">
@@ -103,7 +100,6 @@ export default function Register() {
                   )}
                 </div>
 
-                {/* Wachtwoord */}
                 <div>
                   <Label htmlFor="password" className="text-white/90">Wachtwoord</Label>
                   <div className="relative mt-1">
@@ -148,7 +144,7 @@ export default function Register() {
           </Card>
         </div>
 
-        {/* RIGHT: Visual panel */}
+        {/* RIGHT: Visual */}
         <div className="order-1 md:order-2">
           <div className="card p-8 md:p-10 relative overflow-hidden">
             <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-gradient-to-br from-blue-500/40 to-emerald-400/40 blur-3xl" />
